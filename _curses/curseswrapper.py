@@ -22,27 +22,25 @@ class CursesWrapper:
         self._in_context_manager: bool = False
         self._background_character: str = background_character
 
-        if width > 0:
-            self._width: int = width
-        else:
-            self._width: int = getTerminalDimensions()[0]
 
-        if height > 0:
-            self._height: int = height
-        else:
-            self._height: int = getTerminalDimensions()[1]
+        if width < 1:
+            self.width: int = getTerminalDimensions()[0]
 
-        self._initialize_buffer()
+        if height < 1:
+            self.height: int = getTerminalDimensions()[1]
 
-    def _initialize_buffer(self):
-        self._buffer: List = [[self._background_character for x in range(self._width)] for y in range(self._height)]
+        self._initialize_buffer(width, height)
+
+    def _initialize_buffer(self, width: int, height: int):
+        self._buffer: List = [[self._background_character for x in range(width)] for y in range(height)]
 
     def __enter__(self):
         self._in_context_manager = True
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._make_room(1)
+        # self._make_room(1)
+        [print() for i in range(self.height)]
         self._in_context_manager = False
 
     @requires_context_manager
@@ -52,17 +50,17 @@ class CursesWrapper:
         except:
             raise Exception(f"Unknown operand {item}!")
 
-    @requires_context_manager
+    # @requires_context_manager
     def __setitem__(self, key: Tuple[int, int], value: str):
         self._set_character(key[0], key[1], value[0], False)
         if len(value) > 1:
             return self.__setitem__((key[0] + 1, key[1]), value[1:])
 
-    @requires_context_manager
+    # @requires_context_manager
     def _set_character(self, x: int, y: int, character: str, wrap_around: bool=False):
         if wrap_around:
-            x = x % self._width
-            y = y % self._height
+            x = x % self.width
+            y = y % self.height
 
         self._buffer[y][x] = character
 
@@ -72,13 +70,31 @@ class CursesWrapper:
 
     @requires_context_manager
     def flush(self):
-        for y in range(self._height):
-            for x in range(self._width):
-                print(self[x, y], flush=True, end="")
+        for y in range(self.height):
+            for x in range(self.width):
+                print(self._buffer[y][x], flush=True, end="")
             print()
 
-        self._make_room(self._height)
+        self._make_room(self.height)
 
+    @property
+    def height(self):
+        # return self._height
+        return len(self._buffer)
+
+    @height.setter
+    def height(self, value):
+        raise Exception("Readonly")
+        # self._height = value
+
+    @property
+    def width(self):
+        return len(self._buffer[0])
+
+    @width.setter
+    def width(self, value):
+        raise Exception("Readonly")
+        # self._width = value
 
 def getTerminalDimensions():
     height, width = os.popen("stty size").read().split()

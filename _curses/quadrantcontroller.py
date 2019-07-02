@@ -1,73 +1,120 @@
-from typing import Tuple
+from __future__ import annotations
+
+import itertools
+from typing import Tuple, List, Dict
 
 from _curses.curseswrapper import CursesWrapper, requires_context_manager
 
 
 class QuadrantController(CursesWrapper):
-    _charset = {
-        "0000": " ",
-        "0001": "▖",
-        "0010": "▗",
-        "0011": "▄",
-        "0100": "▝",
-        "0101": "▞",
-        "0110": "▐",
-        "0111": "▟",
-        "1000": "▘",
-        "1001": "▌",
-        "1010": "▚",
-        "1011": "▙",
-        "1100": "▀",
-        "1101": "▛",
-        "1110": "▜",
-        "1111": "█"
-    }
+    def __init__(self, background_character: str = "█", width: int=-1, height: int=-1, invert: bool=False):
+        self.invert = invert
+        super().__init__(background_character, width // 2, height // 2)
 
-    _charset_reversed = {
-        key: value for key, value in zip(_charset.values(), _charset.keys())
-    }
-
-    @classmethod
-    def _getChar(cls, top_left, top_right, bottom_right, bottom_left):
-        return cls._charset[f"{1 if top_left else 0}{1 if top_right else 0}{1 if bottom_right else 0}{1 if bottom_left else 0}"]
-
-    def __init__(self, background_character: str = "@", width: int = -1, height: int = -1):
-        super().__init__("█", width // 2, height // 2)
-
-    @requires_context_manager
-    def _getNewChar(self, old_char: str, x: int, y: int, on: bool):
-        old_string: str = self._charset_reversed[old_char]
-        new_string: str
-
-        if y == 0:
-            if x == 0:
-                new_string = f"{1 if on else 0}{old_string[1:]}"
-            elif x == 1:
-                new_string = f"{old_string[:1]}{1 if on else 0}{old_string[2:]}"
-            else:
-                raise Exception()
-        elif y == 1:
-            if x == 0:
-                new_string = f"{old_string[:3]}{1 if on else 0}"
-            elif x == 1:
-                new_string = f"{old_string[:2]}{1 if on else 0}{old_string[3:]}"
-            else:
-                raise Exception()
-
-        return self._charset[new_string]
+    def _initialize_buffer(self, width: int, height: int):
+        super()._initialize_buffer(width, height)
 
 
-    @requires_context_manager
+    def __init_background(self):
+        for y, x in itertools.product(range(self.height), range(self.width)):
+            
+    # @requires_context_manager
     def __setitem__(self, key: Tuple[int, int], value: str):
+
         base_x = key[0] // 2
         base_y = key[1] // 2
 
         offset_x = key[0] % 2
         offset_y = key[1] % 2
 
-        return super().__setitem__((base_x, base_y), self._getNewChar(self[key], offset_x, offset_y, value))
+        if self.invert:
+            new_quadrant = str(Quadrant.fromChar(self._buffer[base_y][base_x]).invert().changePixel(offset_x, offset_y, bool(value)).invert())
+        else:
+            new_quadrant = str(Quadrant.fromChar(self._buffer[base_y][base_x]).changePixel(offset_x, offset_y, bool(value)))
+        return super().__setitem__((base_x, base_y), new_quadrant)
 
     @requires_context_manager
     def __getitem__(self, item: tuple):
         return super().__getitem__(tuple(map(lambda x: x // 2, item)))
 
+    def updateByList(self, list):
+        for y, x in itertools.product(range(len(list)), range(len(list[0]))):
+            self[x, y] = list[y][x]
+
+
+class Quadrant:
+    _charset: Dict[Tuple[bool, bool, bool, bool], str] = {
+        (False, False, False, False): " ",
+        (False, False, False, True) : "▗",
+        (False, False, True, False) : "▖",
+        (False, False, True, True)  : "▄",
+        (False, True, False, False) : "▝",
+        (False, True, False, True)  : "▐",
+        (False, True, True, False)  : "▞",
+        (False, True, True, True)   : "▟",
+        (True, False, False, False) : "▘",
+        (True, False, False, True)  : "▚",
+        (True, False, True, False)  : "▌",
+        (True, False, True, True)   : "▙",
+        (True, True, False, False)  : "▀",
+        (True, True, False, True)   : "▜",
+        (True, True, True, False)   : "▛",
+        (True, True, True, True)    : "█"
+    }
+    _inverse_first: Dict[str, str] = {
+        " ": "█",
+        "▖": "▜",
+        "▗": "▛",
+        "▄": "▀",
+        "▝": "▙",
+        "▞": "▚",
+        "▐": "▌",
+        "▟": "▘"
+    }
+
+    _inverse_last: Dict[str, str] = {
+        value: key for key, value in zip(_inverse_first.keys(), _inverse_first.values())
+    }
+
+    _charset_reversed:  Dict[str, Tuple[bool, bool, bool, bool]] = {
+        value: key for key, value in zip(_charset.keys(), _charset.values())
+    }
+
+    def __init__(self, state: Tuple[bool, ...], invert=False):
+        self.state = state
+        self._invert = invert
+
+    @classmethod
+    def fromChar(cls, char: str) -> Quadrant:
+        if char not in cls._charset_reversed:
+            raise Exception(f"Invalid char {char}!")
+        else:
+            return cls(cls._charset_reversed[char])
+
+    def __str__(self) -> str:
+        return self._charset[self.state]
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __eq__(self, o: object) -> bool:
+        return str(self) == str(o)
+
+    def __getitem__(self, item):
+        return self
+
+    def __len__(self):
+        return 1
+
+    def changePixel(self, x: int, y: int, new_state: bool) -> Quadrant:
+        x %= 2
+        y %= 2
+
+        index = 2 * y + x
+
+        new_buffer = list(self.state)
+        new_buffer[index] = new_state
+        return Quadrant(tuple(new_buffer))
+
+    def invert(self) -> Quadrant:
+        return Quadrant(tuple(map(lambda x: not x, self.state)))
