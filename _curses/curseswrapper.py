@@ -1,7 +1,5 @@
-import itertools
-import time
 import os
-from typing import List, Union, Callable, Tuple
+from typing import List, Union, Callable, Tuple, Iterable, Collection
 
 
 def requires_context_manager(func: Callable):
@@ -16,11 +14,11 @@ def requires_context_manager(func: Callable):
 
 
 class CursesWrapper:
-    def __init__(self, background_character: str="@", width: int=-1, height: int=-1):
+    def __init__(self, transparent_character: str= "@", width: int=-1, height: int=-1, ):
 
         self._buffer: List = []
         self._in_context_manager: bool = False
-        self._background_character: str = background_character
+        self._transparent_character: str = transparent_character
 
 
         if width < 1:
@@ -32,7 +30,7 @@ class CursesWrapper:
         self._initialize_buffer(width, height)
 
     def _initialize_buffer(self, width: int, height: int):
-        self._buffer: List = [[self._background_character for x in range(width)] for y in range(height)]
+        self._buffer: List = [[self._transparent_character for x in range(width)] for y in range(height)]
 
     def __enter__(self):
         self._in_context_manager = True
@@ -44,11 +42,11 @@ class CursesWrapper:
         self._in_context_manager = False
 
     @requires_context_manager
-    def __getitem__(self, item: tuple):
+    def __getitem__(self, item: Tuple[int, int]):
         try:
             return self._buffer[item[1]][item[0]]
         except:
-            raise Exception(f"Unknown operand {item}!")
+            raise Exception(f"Unknown argument {item}!")
 
     # @requires_context_manager
     def __setitem__(self, key: Tuple[int, int], value: str):
@@ -96,7 +94,18 @@ class CursesWrapper:
         raise Exception("Readonly")
         # self._width = value
 
+    @requires_context_manager
+    def updateByList(self, _list: Collection[Collection], offset_x: int=0, offset_y: int=0, transparent_char="@"):
+        for y in range(len(_list)):
+            for x in range(len(_list[y])):
+                if _list[y][x] == transparent_char:
+                    continue
+                else:
+                    self[x, y] = _list[y][x]
+
+
+
+
 def getTerminalDimensions():
     height, width = os.popen("stty size").read().split()
-
     return int(width), int(height),
