@@ -33,7 +33,8 @@ class Scene:
 
     def commit(self):
         for layer in self.layers:
-            self.wrapper.updateByList(layer.typeset(self.wrapper.width, self.wrapper.height), transparent_char=layer.background_char)
+            self.wrapper.updateByList(layer.render(), offset_x=layer.pos_x, offset_y=layer.pos_y,
+                                      transparent_char=layer.background_char)
 
         self.wrapper.flush()
 
@@ -94,58 +95,27 @@ class Layer:
         self.pos_y = pos_y
         self.pos_x = pos_x
 
-    def typeset(self, dim_x:int, dim_y: int) -> List[List]:
-        buffer = []
-        if self.mode.value | LayerMode.CENTER_HORISONTAL.value:
-            horisontal_padding = (dim_x - self.sprite.dim_x - self.pos_x) // 2
-            print(horisontal_padding)
-            for y in range(self.sprite.dim_y):
-                buffer.append([])
-                for x in range(dim_x):
-                    if x < horisontal_padding or x >= self.sprite.dim_x:
-                        buffer[y].append(self.background_char)
-                    else:
-                        buffer[y].append(self.sprite.render()[y][x])
-        else:
-            buffer = self.sprite.render()
-        # print(buffer)
-        buffer2 = []
-
-        if self.mode.value | LayerMode.CENTER_VERTICAL.value:
-            vertical_padding = (dim_y - self.sprite.dim_y - self.pos_y) // 2
-            for y in range(dim_y):
-                if y < vertical_padding or y >= self.sprite.dim_y:
-                    buffer2.append([self.background_char for _ in range(dim_x)])
-                    continue
-                else:
-                    buffer2.append([])
-
-                for x in range(self.sprite.dim_x):
-                    buffer2[y].append(buffer[y][x])
-        else:
-            buffer2 = buffer
-
-        # print(buffer2)
-        return buffer2
-
     def isTransparent(self, char) -> bool:
         return char == self.background_char
 
+    def render(self) -> List[List]:
+        return self.sprite.render()
+
     def __str__(self):
-        return "\n".join(map("".join, self.typeset(30, 30)))
-        return "\n".join(map("".join, self.typeset(self.sprite.dim_x + 10, self.sprite.dim_y + 10)))
+        return "\n".join(map("".join, self.render()))
 
 if __name__ == '__main__':
-    scene = Scene(dim_x=80, dim_y=24)
+    scene = Scene(dim_x=80, dim_y=10)
     dino = Sprite.fromFile("assets/dino.txt")
     # print(dino)
-    print(dino.dim_x, dino.dim_y)
-    layer = Layer(dino, background_char="§", mode=LayerMode.CENTERED,)
+    layer = Layer(dino, background_char="§")
+    layer2 = Layer(dino, background_char="§", pos_x=2)
     # layer.typeset(30, 30)
-    print(layer)
-    # scene.addLayer(layer)
+    # print(layer)
+    scene.addLayer(layer)
+    scene.addLayer(layer2)
     # print(scene.layers)
-    # with scene:
-        # scene.commit()
+    with scene:
+        scene.commit()
 
 

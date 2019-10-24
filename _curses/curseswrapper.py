@@ -101,7 +101,7 @@ class CursesWrapper:
                 if _list[y][x] == transparent_char:
                     continue
                 else:
-                    self[x, y] = _list[y][x]
+                    self[offset_x + x, offset_y + y] = _list[y][x]
 
 
 
